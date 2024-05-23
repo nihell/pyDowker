@@ -1,3 +1,12 @@
 # pyDowker: Dowker complexes with Python
 
-work in progress
+Under development!
+
+## Installation
+
+Clone the repository and install via:
+
+``` pip install -e . ```
+
+## References
+
