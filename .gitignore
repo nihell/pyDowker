@@ -1,2 +1,7 @@
 src/pyDowker/__pycache__/*
 src/pyDowker.egg-info/*
+examples/ProteinLigandBinding/*.pdb
+examples/ProteinLigandBinding/__pycache__
+examples/ProteinLigandBinding/pdbbind_data/*
+examples/Gene_cancer
+examples/tmp_dist_

@@ -165,11 +165,16 @@ class DowkerComplex:
 
             simplices.append(sigma)
             sorted_witness_values = np.sort(witness_values)
-            if normalize:
-                appearances.append([(sorted_witness_values[i-1],i/(LAMBDA.shape[1])) for i in range(1,m_max+1)])
-            else:            
-                appearances.append([(sorted_witness_values[i-1],i) for i in range(1,m_max+1)])
+            this_appearances = []
+            for i in range(1,m_max+1):
+                if np.isinf(sorted_witness_values[i-1]):
+                    break
 
+                if normalize:
+                    this_appearances.append((sorted_witness_values[i-1],i/(LAMBDA.shape[1])))
+                else:            
+                    this_appearances.append((sorted_witness_values[i-1],i))
+            appearances.append(this_appearances)
             if len(sigma)<=max_dimension:
                 for j in range(np.max(sigma)+1,num_points):
                     tau = sigma+[j]
@@ -211,10 +216,9 @@ class DowkerComplex:
             A RIVET-compatible bifiltration listing simplices and their bidegrees of appearance.
         """
 
-        np.savetxt('tmp_dist_',self.distance_matrix,delimiter=',')
+        np.savetxt('tmp_dist_',self.rel_matrix,delimiter=',')
         run_args = ["./a.out", 'tmp_dist_', '{}'.format(max_dimension), '{}'.format(m_max)]
-        if self.point_is_its_own_neighbor:
-            run_args.append("closed")
+        run_args.append("closed")
         subprocess.run(run_args)
         f = open("tmp_dist_mneighbor.bifi")
         return f
