@@ -1,0 +1,7 @@
+\begin{tabular}{rrrl}
+\toprule
+m & train R^2 & test R^2 & oob \\
+\midrule
+1 & 0.942582 & 0.471862 & NaN \\
+\bottomrule
+\end{tabular}

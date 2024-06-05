@@ -3,5 +3,11 @@ src/pyDowker.egg-info/*
 examples/ProteinLigandBinding/*.pdb
 examples/ProteinLigandBinding/__pycache__
 examples/ProteinLigandBinding/pdbbind_data/*
+examples/ProteinLigandBinding/.ipynb_checkpoints
+examples/.ipynb_checkpoints
+src/pyDowker/.ipynb_checkpoints
 examples/Gene_cancer
 examples/tmp_dist_
+examples/output
+*.bifi
+*.out
