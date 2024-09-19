@@ -1,0 +1,8 @@
+\begin{tabular}{lr}
+\toprule
+m & 1 \\
+\midrule
+train R^2 & 0.898395 \\
+test R^2 & 0.355789 \\
+\bottomrule
+\end{tabular}

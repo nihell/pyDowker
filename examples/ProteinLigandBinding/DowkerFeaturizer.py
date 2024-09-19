@@ -77,13 +77,13 @@ def featurize_contacts_dowker(
 
     return (local_dgm0,local_dgm1)
 
-def featurize_contacts_dowker_bifi(
+def featurize_contacts_dowker_betti_stack(
     frag1: Tuple,
     frag2: Tuple,
     pairwise_distances: np.ndarray = None,
     cutoff: float = 4.5,
     m_max: int = 10) -> Tuple[Dict[int, str], Dict[int, str]]:
-    """Computes ECFP dicts for pairwise interaction between two molecular fragments.
+    """Computes stacked betti curves for pairwise interaction between two molecular fragments.
 
     Parameters
     ----------
@@ -120,7 +120,7 @@ def featurize_contacts_dowker_bifi(
                     st.compute_persistence()
                     local_dgm0.append(st.persistence_intervals_in_dimension(0))
                     local_dgm1.append(st.persistence_intervals_in_dimension(1))
-                #bifi = mnc.create_rivet_bifiltration(max_dimension=2,m_max=m_max)
+                    #bifi = mnc.create_rivet_bifiltration(max_dimension=2,m_max=m_max)
                 #betti0 = rivet.betti(bifi,homology=0,x=m_max,y=m_max)
                 #betti1 = rivet.betti(bifi,homology=1,x=m_max,y=m_max)
                 #lsc0 = multiparameter_landscape(computed_data=rivet._compute_bytes(bifi,homology=0,x=m_max,y=m_max, verify=False), grid_step_size=1).compute_multiparameter_landscape()
@@ -140,6 +140,70 @@ def featurize_contacts_dowker_bifi(
 #             local_betti0.append(lsc0)
 #             local_betti1.append(lsc1)     
     return (local_dgm0,local_dgm1)
+
+def featurize_contacts_dowker_bifi(
+    frag1: Tuple,
+    frag2: Tuple,
+    pairwise_distances: np.ndarray = None,
+    cutoff: float = 100,
+    m_max: int = 10) -> Tuple[Dict[int, str], Dict[int, str]]:
+    """Computes ECFP dicts for pairwise interaction between two molecular fragments.
+
+    Parameters
+    ----------
+    frag1: Tuple
+    A tuple of (coords, mol) returned by `load_molecule`.
+    frag2: Tuple
+    A tuple of (coords, mol) returned by `load_molecule`.
+    pairwise_distances: np.ndarray
+    Array of pairwise fragment-fragment distances (Angstroms)
+    cutoff: float
+    Cutoff distance for contact consideration
+    m_max: int
+    maximal number of witnesses to consider.
+
+    Returns
+    -------
+    pair of lists of persistence diagrams for dimensions 0 and 1 with number of witnesses from 1 to m_max
+    """
+    if pairwise_distances is None:
+        pairwise_distances = compute_pairwise_distances(frag1[0], frag2[0])
+        
+    ligand_atoms = np.array([a.GetSymbol() for a in frag1[1].GetAtoms()])
+    protein_atoms = np.array([a.GetSymbol() for a in frag2[1].GetAtoms()])
+    
+    local_betti0 = []
+    local_betti1 = []
+    for la in ['C', 'N', 'O', 'S', 'P', 'F', 'Cl', 'Br', 'I']:
+        for pa in ['C', 'N', 'O', 'S']:
+            local_dist = pairwise_distances[ligand_atoms==la,:][:,protein_atoms==pa]
+            if local_dist.shape[1]>0:
+                mnc = DowkerComplex(local_dist, max_filtration=cutoff)
+#                    st = mnc.create_simplex_tree(max_dimension=2, m=m, filtration="Sublevel")
+#                    st.compute_persistence()
+#                    local_dgm0.append(st.persistence_intervals_in_dimension(0))
+#                    local_dgm1.append(st.persistence_intervals_in_dimension(1))
+                bifi = mnc.create_rivet_bifiltration(max_dimension=2,m_max=m_max)
+                betti0 = rivet.betti(bifi,homology=0,x=64,y=m_max)
+                betti1 = rivet.betti(bifi,homology=1,x=64,y=m_max)
+                #lsc0 = multiparameter_landscape(computed_data=rivet._compute_bytes(bifi,homology=0,x=m_max,y=m_max, verify=False), grid_step_size=1).compute_multiparameter_landscape()
+                #lsc0 = multiparameter_landscape(computed_data=rivet._compute_bytes(bifi,homology=1,x=m_max,y=m_max, verify=False), grid_step_size=1).compute_multiparameter_landscape()
+                local_betti0.append(betti0)
+                local_betti1.append(betti1)
+            else:
+                #    local_dgm0.append(np.empty((0,2)))
+                #    local_dgm1.append(np.empty((0,2)))
+                #lsc0=np.zeros((m_max,m_max))
+                #lsc1=np.zeros((m_max,m_max))
+                local_betti0.append(rivet.MultiBetti(dimensions = rivet.Dimensions([0],[0]), 
+                                                      graded_rank=np.array([[0.]]),
+                                                      xi_0=[],xi_1=[],xi_2=[]))
+                local_betti1.append(rivet.MultiBetti(dimensions = rivet.Dimensions([0],[0]), 
+                                                      graded_rank=np.array([[0.]]),
+                                                      xi_0=[],xi_1=[],xi_2=[]))
+#             local_betti0.append(lsc0)
+#             local_betti1.append(lsc1)     
+    return (local_betti0,local_betti1)
 
 
 def featurize_contacts_dowker_ecp(
@@ -234,7 +298,59 @@ class DowkerFeaturizer(ComplexFeaturizer):
     
 class DowkerBifiFeaturizer(ComplexFeaturizer):
 
-    def __init__(self, cutoff: float = 4.5, size = 128, m_max=10):
+    def __init__(self, cutoff: float = 100, size = 128, m_max=10):
+        self.cutoff = cutoff
+        self.size = size
+        self.m_max=m_max
+        
+    def _featurize(self, datapoint, **kwargs):
+        """
+        Compute featurization for a molecular complex
+
+        Parameters
+        ----------
+        datapoint: Tuple[str, str]
+          Filenames for molecule and protein.
+        """
+        if 'complex' in kwargs:
+            datapoint = kwargs.get("complex")
+            raise DeprecationWarning(
+              'Complex is being phased out as a parameter, please pass "datapoint" instead.'
+          )
+
+        try:
+            fragments = load_complex(datapoint, add_hydrogens=False)
+
+        except MoleculeLoadException:
+            logger.warning("This molecule cannot be loaded by Rdkit. Returning None")
+            return None
+        pairwise_features = []
+        # We compute pairwise contact fingerprints
+        #b0 = []
+        #b1 = []
+        for (frag1, frag2) in itertools.combinations(fragments, 2):
+          # Get coordinates
+            distances = compute_pairwise_distances(frag1[0], frag2[0])
+            
+            d0,d1 = featurize_contacts_dowker_bifi(frag1, frag2, distances, self.cutoff, self.m_max)
+            #b0.append(d0)
+            #b1.append(d1)
+        db0 = [discretize_graded_rank(b, x_grid = np.linspace(0,100,self.size), y_grid = np.arange(-self.m_max-1,0,1)) for b in d0]
+        db1 = [discretize_graded_rank(b, x_grid = np.linspace(0,100,self.size), y_grid = np.arange(-self.m_max-1,0,1)) for b in d1]
+        db0 = np.concatenate(db0)
+        db1 = np.concatenate(db1)
+        pairwise_features = np.concatenate([db0.flatten(),db1.flatten()])
+        #bc = Landscape(num_landscapes = 4, resolution=self.size, sample_range = (0,100))
+        #bc=BettiCurve(predefined_grid=np.linspace(0,100,self.size))       
+        #bc0 = np.concatenate(bc.fit_transform(dgm0[0]))
+        #bc1 = np.concatenate(bc.fit_transform(dgm1[0]))
+        #pairwise_features =  np.concatenate([bc0,bc1])
+        return pairwise_features
+
+
+class DowkerStackedBettiFeaturizer(ComplexFeaturizer):
+
+    def __init__(self, cutoff: float = 100, size = 128, m_max=10):
         self.cutoff = cutoff
         self.size = size
         self.m_max=m_max
@@ -268,7 +384,7 @@ class DowkerBifiFeaturizer(ComplexFeaturizer):
           # Get coordinates
             distances = compute_pairwise_distances(frag1[0], frag2[0])
             
-            d0,d1 = featurize_contacts_dowker_bifi(frag1, frag2, distances, self.cutoff, self.m_max)
+            d0,d1 = featurize_contacts_dowker_betti_stack(frag1, frag2, distances, self.cutoff, self.m_max)
             dgm0.append(d0)
             dgm1.append(d1)
         #db0 = [discretize_graded_rank(b, x_grid = np.linspace(0,100,self.size), y_grid = np.arange(1,self.m_max,self.m_max)) for b in b0]

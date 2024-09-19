@@ -54,7 +54,9 @@ def discretize_graded_rank(betti, x_grid, y_grid):
         values of the Hilbert function evaluated at the grid points
     """
     betti_grid = np.zeros((len(x_grid), len(y_grid)))
-
+    if (betti.graded_rank==0).all():
+        return betti_grid.T
+    
     for i, x in enumerate(x_grid):
         for j, y in enumerate(y_grid):
             betti_grid[i,j] = graded_rank_at_value(betti, x, y)

@@ -161,12 +161,17 @@ class DowkerComplex:
         simplices = []
         appearances = []
 
+        if m_max > self.rel_matrix.shape[1]:
+            m_max = self.rel_matrix.shape[1]
+            
+
         def append_upper_cofaces(sigma, witness_values):
 
             simplices.append(sigma)
             sorted_witness_values = np.sort(witness_values)
             this_appearances = []
             for i in range(1,m_max+1):
+                
                 if np.isinf(sorted_witness_values[i-1]):
                     break
 
