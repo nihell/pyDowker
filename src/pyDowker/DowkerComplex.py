@@ -1,8 +1,9 @@
+from . import _dowker_complex
 from gudhi import SimplexTree
 import numpy as np
-from pyrivet import rivet
 import subprocess
 import tempfile
+import multipers as mp
 
 class DowkerComplex:
     """
@@ -153,7 +154,10 @@ class DowkerComplex:
         rivet.Bifiltration
             A RIVET-compatible bifiltration listing simplices and their bidegrees of appearance.
         """
-        
+        try:
+            from pyrivet import rivet
+        except ModuleNotFoundError:
+            raise Exception("pyRivet not installed")
 
         LAMBDA = self.rel_matrix
         num_points=len(LAMBDA)
@@ -220,14 +224,32 @@ class DowkerComplex:
         rivet.Bifiltration
             A RIVET-compatible bifiltration listing simplices and their bidegrees of appearance.
         """
-
-        np.savetxt('tmp_dist_',self.rel_matrix,delimiter=',')
-        run_args = ["./a.out", 'tmp_dist_', '{}'.format(max_dimension), '{}'.format(m_max)]
-        run_args.append("closed")
-        subprocess.run(run_args)
-        f = open("tmp_dist_mneighbor.bifi")
-        return f
+        return _dowker_complex.create_bifiltration(self.rel_matrix, max_dimension, m_max)
     
+    
+    def create_multipers_bifiltration(self, max_dimension: int|None  , m_max: int|None = 5) -> mp.SimplexTreeMulti:
+        """
+        Calls the experimental C++ implementation, which is faster but currently only handles float matrices.
+
+        Parameters
+        ----------
+        max_dimension : int
+            Dimension of the skeleton to compute.
+        m_max : int, optional
+            Maximal number of witnesses to include, by default 5
+
+        Returns
+        -------
+        multipers.simplex_tree_multi
+            A multipers bifiltration listing simplices and their bidegrees of appearance.
+        """
+        st = mp.SimplexTreeMulti(num_parameters = 2)
+        simplices , appearances = _dowker_complex.create_bifiltration(self.rel_matrix, max_dimension, m_max)
+        for i in range(len(simplices)):
+            for a in appearances[i]:
+                st.insert(simplices[i],a)
+        return st
+
     def euler_profile_contributions(self, m_max=10):
         """
             creates a list of contributions of bifiltration values to the Euler characteristic profile.

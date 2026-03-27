@@ -1,10 +1,17 @@
+[build-system]
+requires = [
+  "scikit-build-core>=0.8",
+  "pybind11>=2.11"
+]
+build-backend = "scikit_build_core.build"
+
 [project]
 name = "pyDowker"
 version = "0.0.1"
 authors = [
   { name="Niklas Hellmer", email="nhellmer@impan.pl" },
 ]
-description = "A small example package"
+description = "A package to build (bi)filtered Dowker complexes"
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
@@ -12,7 +19,19 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+dependencies = [
+    "ipython>=8.12.3",
+    "matplotlib>=3.7.5",
+    "networkx>=3.1",
+    "pytest>=8.3.5",
+]
 
 [project.urls]
 Homepage = "https://github.com/nihell/pyDowker"
 Issues = "https://github.com/nihell/pyDowker/issues"
+
+[tool.scikit-build.cmake.define]
+CMAKE_BUILD_TYPE = "Release"
+
+[tool.scikit-build]
+wheel.packages = ["src/pyDowker"]
