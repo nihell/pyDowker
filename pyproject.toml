@@ -16,3 +16,25 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/nihell/pyDowker"
 Issues = "https://github.com/nihell/pyDowker/issues"
+
+[project.optional-dependencies]
+# Everything the test suite needs. numpy, gudhi and pyrivet are listed here because the
+# package does not declare them yet (PKG-001); pyrivet is not on PyPI and needs scipy.
+test = [
+  "numpy",
+  "gudhi",
+  "scipy",
+  "pyrivet @ git+https://github.com/rivetTDA/rivet-python.git",
+  "pytest",
+  "pyyaml",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Import pyDowker from the checkout pytest runs in (main or a worktree), never from an
+# editable install that points elsewhere.
+pythonpath = ["src"]
+addopts = "-ra --strict-markers"
+markers = [
+  "req(id): ties a test to requirements.yaml; the requirement's status sets the expected outcome (tests/conftest.py)",
+]

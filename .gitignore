@@ -11,3 +11,6 @@ examples/tmp_dist_
 examples/output
 *.bifi
 *.out
+# test and tooling caches
+__pycache__/
+.pytest_cache/

@@ -1,0 +1,168 @@
+# Requirement registry for pyDowker.
+#
+# Every change to src/ should trace back to an entry here. A requirement becomes
+# binding through its contract: tests marked @pytest.mark.req("<ID>"). The status
+# decides how pytest treats those tests (see tests/conftest.py):
+#
+#   proposed     recorded, not committed to; spec and contract optional
+#   accepted     committed to; must have a contract; contract runs as strict xfail
+#   in-progress  someone is implementing it; contract runs as strict xfail
+#   implemented  contract must pass
+#   dropped      contract is skipped; keep the entry and say why in notes
+#
+# Strict xfail means a contract that starts passing while the status says otherwise
+# fails the run, so the registry cannot silently drift from the code.
+#
+# Implementers may change only `status`, and only accepted -> in-progress -> implemented.
+# Everything else is edited in spec sessions. `python scripts/check_requirements.py`
+# validates this file and prints the dependency graph.
+#
+# Fields: id, title, kind (bug | feature | budget | infra), origin, status,
+# optional: serves, spec, contract (list of test files), budget, blocked_by, notes.
+# AttentionDowker hypotheses: H1 asymmetry, H2 higher-order, H3 head-resolved,
+# H4 head-agreement bifiltration, H5 prompt-response coupling, H6 stability.
+
+requirements:
+
+  - id: DWK-001
+    title: Sublevel filtration accepts any floating dtype and runs on NumPy >= 2
+    kind: bug
+    origin: oracle-suite 2026-10-20; attention/phase-0 (attention weights arrive as float32)
+    serves: [pyDowker, attention/all]
+    contract: [tests/contracts/test_dwk001_float_dtypes.py]
+    status: accepted
+    notes: >
+      The dtype check compares against np.float_, which NumPy 2.0 removed, so the
+      README's main path raises AttributeError. On NumPy 1.x the same check rejects
+      float16/float32. Boolean input must still be rejected by the sublevel path.
+
+  - id: DWK-002
+    title: filtration="None" builds the Dowker complex of the relation, honouring m
+    kind: bug
+    origin: oracle-suite 2026-10-20
+    serves: [pyDowker]
+    contract: [tests/contracts/test_dwk002_unfiltered.py]
+    status: accepted
+    notes: >
+      Both witness checks use len() of a boolean array (always the number of columns),
+      so the method returns the full max_dimension-skeleton of the simplex on all rows
+      regardless of the relation, and m has no effect.
+
+  - id: DWK-003
+    title: euler_profile_contributions runs and matches the Euler characteristic profile
+    kind: bug
+    origin: oracle-suite 2026-10-20
+    serves: [pyDowker]
+    contract: [tests/contracts/test_dwk003_euler_profile.py]
+    status: accepted
+    notes: >
+      Reads self.distance_matrix, which does not exist (the attribute is rel_matrix),
+      so every call raises AttributeError. The contribution logic itself is consistent
+      with ecp_value's (<=, >=) convention; the contract checks the evaluated profile
+      against a brute-force Euler characteristic.
+
+  - id: DWK-004
+    title: The constructor's max_filtration is applied, not silently discarded
+    kind: bug
+    origin: oracle-suite 2026-10-20
+    serves: [pyDowker, attention/all]
+    contract: [tests/contracts/test_dwk004_constructor_cutoff.py]
+    status: accepted
+    notes: >
+      DowkerComplex.__init__ documents max_filtration but never stores it; only the
+      method argument (default inf) prunes. The examples pass cutoffs to the
+      constructor (e.g. DowkerFeaturizer uses 4.5), so those runs enumerate without a
+      cutoff. Open for the spec: precedence when both constructor and method give a
+      cutoff, and whether the RIVET paths honour it. The contract covers only the
+      constructor-only case.
+
+  - id: DWK-005
+    title: TotalWeight filtration contains only witnessed simplices
+    kind: bug
+    origin: oracle-suite 2026-10-20
+    serves: [pyDowker]
+    contract: [tests/contracts/test_dwk005_total_weight.py]
+    status: accepted
+    notes: >
+      Vertices are inserted unconditionally, so a row without witnesses appears as an
+      isolated vertex at filtration 0 and adds an essential H0 class. Higher simplices
+      already require a common witness. Low impact; fix with the next change to that path.
+
+  - id: PKG-001
+    title: pyDowker installs and imports without RIVET
+    kind: feature
+    origin: attention/phase-0 (AttentionDowker uses multipers; pyrivet is not on PyPI)
+    serves: [attention/all]
+    contract: [tests/contracts/test_pkg001_optional_rivet.py]
+    status: accepted
+    notes: >
+      Today both modules import pyrivet at top level and pyproject declares no
+      dependencies, so a fresh `pip install -e .` gives a package that cannot be
+      imported. Contract: numpy and gudhi declared as dependencies, pyrivet in an
+      optional extra named `rivet`, gudhi-only paths usable without pyrivet, and the
+      RIVET methods raising ImportError that names the extra.
+
+  - id: DWK-006
+    title: Head-agreement bifiltration R_{t,k} from a stack of per-head matrices
+    kind: feature
+    origin: attention/design (head-agreement bifiltration as 2-parameter surrogate)
+    serves: [attention/H4-head-agreement]
+    spec: docs/specs/attention-interface.md
+    status: proposed
+    notes: >
+      Per-k slices are the existing sublevel path applied to the k-th order statistic
+      across heads, so the oracles carry over slice by slice. Blocked on the open
+      decisions in the spec (pair-level vs simplex-level agreement, output format).
+
+  - id: BENCH-001
+    title: Fresh-process benchmark harness (wall time and peak RSS per run)
+    kind: infra
+    origin: RipsLink Phase 8 (VmHWM is monotone within a process)
+    serves: [attention/all]
+    status: proposed
+    notes: >
+      Each measurement runs in its own process and reports peak RSS from that process
+      only. Needed before any budget below can be accepted.
+
+  - id: DWK-007
+    title: Per-layer budget for per-head sublevel persistence
+    kind: budget
+    origin: attention/phase-0
+    serves: [attention/H1-asymmetry, attention/H3-head-resolved]
+    spec: docs/specs/attention-interface.md
+    budget: "one layer (12 heads, n ~ 512, max_dimension <= 2) < 30 s on Niklas's laptop CPU"
+    blocked_by: [BENCH-001]
+    status: proposed
+    notes: >
+      Pull policy: accept only once Phase 0 shows signal for a hypothesis this serves
+      and the measured Python path misses the budget. Baseline in
+      docs/reports/2026-10-20-baseline-cost.md.
+
+  - id: DWK-008
+    title: Vectorised sublevel recursion
+    kind: feature
+    origin: docs/reports/2026-10-20-baseline-cost.md
+    serves: [attention/H1-asymmetry, attention/H3-head-resolved]
+    blocked_by: [DWK-007]
+    status: proposed
+    notes: >
+      The recursion evaluates every candidate coface with its own numpy call before
+      pruning, so with a cutoff its cost follows the candidates, not the simplices kept.
+      Prototypes in the report's script compute all cofaces of a node in one step, insert
+      top-dimensional cofaces with one insert_batch call, and under a cutoff use only the
+      witnesses that still relate to the node. They produce identical trees on the
+      verification inputs and are several times faster (numbers in the report). The
+      oracle suite already covers correctness; the timing contract comes with DWK-007.
+
+  - id: ENG-001
+    title: Native Dowker homology engine (C++ core, Python bindings)
+    kind: feature
+    origin: dowker-engine design notes (chat)
+    blocked_by: [DWK-008]
+    status: proposed
+    notes: >
+      Not in this repository. Design decided in chat for the non-filtered Z/p scope:
+      Dowker duality, cohomology-first reduction, clearing, apparent pairs via discrete
+      Morse theory, bitset-AND row representations. Pulled only if DWK-008 still misses
+      DWK-007's budget. Whether the first version targets the filtered case is open:
+      docs/decisions/0002-native-engine-scope.md.
