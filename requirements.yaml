@@ -30,7 +30,7 @@ requirements:
     origin: oracle-suite 2026-10-20; attention/phase-0 (attention weights arrive as float32)
     serves: [pyDowker, attention/all]
     contract: [tests/contracts/test_dwk001_float_dtypes.py]
-    status: accepted
+    status: implemented
     notes: >
       The dtype check compares against np.float_, which NumPy 2.0 removed, so the
       README's main path raises AttributeError. On NumPy 1.x the same check rejects

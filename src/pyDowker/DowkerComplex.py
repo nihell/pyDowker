@@ -66,7 +66,7 @@ class DowkerComplex:
         num_points=len(LAMBDA)
         
         if filtration == "Sublevel":
-            if LAMBDA.dtype != np.float_:
+            if not np.issubdtype(LAMBDA.dtype, np.floating):
                 raise TypeError("Only float arrays are allowed with sublevel filtration") 
             def append_upper_cofaces(sigma, r, witness_values):
                 if r > max_filtration:
