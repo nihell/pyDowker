@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 from . import _dowker_complex
 from gudhi import SimplexTree
 import numpy as np
-import subprocess
-import tempfile
-import multipers as mp
+from typing import Literal
+
+try:
+    import multipers as _mp
+    _HAS_MULTIPERS = True
+except ImportError:
+    _HAS_MULTIPERS = False
 
 class DowkerComplex:
     """
@@ -24,15 +30,25 @@ class DowkerComplex:
         self.rel_matrix = rel_matrix
         self.st = None
         
-        
-     
-
-    def create_simplex_tree(self, 
+    def create_simplex_tree_cpp(self, 
                             max_dimension, 
                             filtration = 'None', 
                             m=1, 
                             level = 0, 
                             max_filtration = np.inf):
+        cpp_result = _dowker_complex.create_simplex_tree(self.rel_matrix,max_dimension, filtration, m, level, max_filtration)
+        st = SimplexTree()
+        for (simplex, value) in cpp_result:
+            st.insert(simplex, value)
+        return st
+     
+
+    def create_simplex_tree(self, 
+                            max_dimension: int, 
+                            filtration : Literal['None', 'Sublevel', 'TotalWeight']= 'None' , 
+                            m: int =1, 
+                            level: float = 0, 
+                            max_filtration: float = np.inf):
         """
             Creates a gudhi simplex tree storing a skeleton of the (filtered) simpicial complex.
             Uses recursive algorithm with nummpy arrays, fast for small datasets but worse runtime and memory complexity.
@@ -67,7 +83,7 @@ class DowkerComplex:
         num_points=len(LAMBDA)
         
         if filtration == "Sublevel":
-            if LAMBDA.dtype != np.float_:
+            if LAMBDA.dtype != np.float64:
                 raise TypeError("Only float arrays are allowed with sublevel filtration") 
             def append_upper_cofaces(sigma, r, witness_values):
                 if r > max_filtration:
@@ -154,10 +170,7 @@ class DowkerComplex:
         rivet.Bifiltration
             A RIVET-compatible bifiltration listing simplices and their bidegrees of appearance.
         """
-        try:
-            from pyrivet import rivet
-        except ModuleNotFoundError:
-            raise Exception("pyRivet not installed")
+        
 
         LAMBDA = self.rel_matrix
         num_points=len(LAMBDA)
@@ -197,15 +210,7 @@ class DowkerComplex:
             append_upper_cofaces([k],witness_values)
         
 
-        bf = rivet.Bifiltration(
-            x_label = "relation_value",
-            y_label = "num_witnesses",
-            simplices = simplices,
-            appearances = appearances,
-            yreverse = True
-        )
-
-        return bf
+        return {tuple(simplices[i]): appearances[i] for i in range(len(simplices))}
     
 
     def create_rivet_bifiltration_cpp(self, max_dimension, m_max=5):
@@ -224,10 +229,11 @@ class DowkerComplex:
         rivet.Bifiltration
             A RIVET-compatible bifiltration listing simplices and their bidegrees of appearance.
         """
-        return _dowker_complex.create_bifiltration(self.rel_matrix, max_dimension, m_max)
+        simplices,appearances = _dowker_complex.create_bifiltration(self.rel_matrix, max_dimension, m_max)
+        return {tuple(simplices[i]): appearances[i] for i in range(len(simplices))}
     
     
-    def create_multipers_bifiltration(self, max_dimension: int|None  , m_max: int|None = 5) -> mp.SimplexTreeMulti:
+    def create_multipers_bifiltration(self, max_dimension: int | None, m_max: int | None = 5):
         """
         Calls the experimental C++ implementation, which is faster but currently only handles float matrices.
 
@@ -240,14 +246,92 @@ class DowkerComplex:
 
         Returns
         -------
-        multipers.simplex_tree_multi
+        multipers.SimplexTreeMulti
             A multipers bifiltration listing simplices and their bidegrees of appearance.
+
+        Raises
+        ------
+        ImportError
+            If the ``multipers`` package is not installed.
+            Install it with ``pip install pyDowker[multipers]``.
         """
-        st = mp.SimplexTreeMulti(num_parameters = 2)
-        simplices , appearances = _dowker_complex.create_bifiltration(self.rel_matrix, max_dimension, m_max)
+        if not _HAS_MULTIPERS:
+            raise ImportError(
+                "The 'multipers' package is required for this method. "
+                "Install it with: pip install pyDowker[multipers]"
+            )
+        st = _mp.SimplexTreeMulti(num_parameters=2, kcritical=True)
+        simplices, appearances = _dowker_complex.create_bifiltration(self.rel_matrix, max_dimension, m_max)
         for i in range(len(simplices)):
             for a in appearances[i]:
-                st.insert(simplices[i],a)
+                st.insert(simplices[i], [a[0], -a[1]])
+        return st
+
+    def create_subdivision_simplex_tree(self, max_dimension: int, level: float = 0):
+        """
+        Creates a simplex tree for the subdivision filtration S(D(Y, X, R^T)) of
+        the dual Dowker complex (Theorem 3.3 of the preprint):
+
+            |D(X, Y, R)_•| ≃ |S(D(Y, X, R^T))_•|
+
+        Vertices of the returned simplex tree are integer indices labelling the
+        simplices of D(Y, X, R^T).  A flag σ_0 ⊊ ... ⊊ σ_k in the barycentric
+        subdivision Sd(D(Y, X, R^T)) is inserted with filtration value -|σ_0|,
+        matching the negative convention of the TotalWeight filtration.
+
+        Parameters
+        ----------
+        max_dimension : int
+            Maximum flag dimension to include (= max simplex dimension in output).
+        level : float, optional
+            For non-boolean matrices, entries ≤ level are treated as witnesses.
+            By default 0.
+
+        Returns
+        -------
+        gudhi.SimplexTree
+        """
+        LAMBDA = self.rel_matrix
+        if LAMBDA.dtype != np.bool_:
+            LAMBDA = LAMBDA <= level
+
+        num_cols = LAMBDA.shape[1]
+
+        # Enumerate all simplices of D(Y, X, R^T).
+        # A set of column indices is a simplex iff some row witnesses all of them.
+        dual_simplices = []
+
+        def build_dual(sigma, witnesses):
+            dual_simplices.append(tuple(sigma))
+            if len(sigma) <= max_dimension:
+                for j in range(sigma[-1] + 1, num_cols):
+                    new_witnesses = witnesses & LAMBDA[:, j]
+                    if np.any(new_witnesses):
+                        build_dual(sigma + [j], new_witnesses)
+
+        for j in range(num_cols):
+            col_witnesses = LAMBDA[:, j]
+            if np.any(col_witnesses):
+                build_dual([j], col_witnesses)
+
+        # Sort by (size, lex): any chain σ_0 ⊊ ... ⊊ σ_k has strictly increasing
+        # sizes, so its indices in this list are automatically in increasing order.
+        dual_simplices.sort(key=lambda s: (len(s), s))
+        dual_simplex_sets = [frozenset(s) for s in dual_simplices]
+
+        st = SimplexTree()
+
+        def extend_flag(chain_indices, top_idx, bottom_size):
+            st.insert(chain_indices, float(-bottom_size))
+            if len(chain_indices) <= max_dimension:
+                top_set = dual_simplex_sets[top_idx]
+                for next_idx in range(top_idx + 1, len(dual_simplices)):
+                    if top_set < dual_simplex_sets[next_idx]:
+                        extend_flag(chain_indices + [next_idx], next_idx, bottom_size)
+
+        for i in range(len(dual_simplices)):
+            extend_flag([i], i, len(dual_simplices[i]))
+
         return st
 
     def euler_profile_contributions(self, m_max=10):

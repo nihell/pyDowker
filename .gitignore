@@ -1,3 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+*.egg
+
+# Build
+build/
+_skbuild/
+wheelhouse/
+*.so
+*.pyd
+
+# Docs
+docs/_build/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editors
+.vscode/
+.idea/
+
+# Virtual envs
+.venv/
+venv/
+
+# Project-specific
 src/pyDowker/__pycache__/*
 src/pyDowker.egg-info/*
 examples/ProteinLigandBinding/*.pdb
@@ -11,3 +42,4 @@ examples/tmp_dist_
 examples/output
 *.bifi
 *.out
+preprint.pdf

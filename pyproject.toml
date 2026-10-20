@@ -1,37 +1,103 @@
 [build-system]
 requires = [
   "scikit-build-core>=0.8",
-  "pybind11>=2.11"
+  "pybind11>=2.11",
 ]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "pyDowker"
-version = "0.0.1"
+version = "0.1.0"
 authors = [
-  { name="Niklas Hellmer", email="nhellmer@impan.pl" },
+  { name = "Niklas Hellmer", email = "niklas.hellmer@t-online.de" },
 ]
-description = "A package to build (bi)filtered Dowker complexes"
+description = "Density-sensitive bifiltered Dowker complexes for topological data analysis"
 readme = "README.md"
-requires-python = ">=3.8"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+keywords = [
+  "topological data analysis",
+  "TDA",
+  "persistent homology",
+  "Dowker complex",
+  "bifiltration",
+  "two-parameter persistence",
+]
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: C++",
+  "Topic :: Scientific/Engineering :: Mathematics",
 ]
 dependencies = [
-    "ipython>=8.12.3",
-    "matplotlib>=3.7.5",
-    "networkx>=3.1",
-    "pytest>=8.3.5",
+  "numpy>=1.24",
+  "gudhi>=3.8",
+]
+
+[project.optional-dependencies]
+multipers = [
+  "multipers>=2.0",
+]
+examples = [
+  "matplotlib>=3.7",
+  "seaborn>=0.13",
+  "networkx>=3.1",
+  "notebook>=7.0",
+]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "hypothesis>=6.0",
+  "pyDowker[examples]",
+]
+docs = [
+  "sphinx>=7.0",
+  "sphinx-autodoc-typehints>=1.25",
+  "myst-parser>=2.0",
+  "furo>=2024.1",
+  "nbsphinx>=0.9",
+  "scikit-learn>=1.3",
+  "networkx>=3.1",
+  "matplotlib>=3.7",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nihell/pyDowker"
+Repository = "https://github.com/nihell/pyDowker"
 Issues = "https://github.com/nihell/pyDowker/issues"
+Documentation = "https://pydowker.readthedocs.io"
+Paper = "https://arxiv.org/abs/2405.15592"
+
+[tool.scikit-build]
+wheel.packages = ["src/pyDowker"]
 
 [tool.scikit-build.cmake.define]
 CMAKE_BUILD_TYPE = "Release"
 
-[tool.scikit-build]
-wheel.packages = ["src/pyDowker"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v"
+
+[tool.cibuildwheel]
+# Build for CPython only (no PyPy), skip 32-bit Windows and musllinux for now
+build = "cp39-* cp310-* cp311-* cp312-*"
+skip = ["*-win32", "*-manylinux_i686"]
+test-requires = ["pytest", "gudhi"]
+test-command = "pytest {project}/tests -x -q --ignore={project}/tests/test_multipers.py"
+
+[tool.cibuildwheel.linux]
+before-all = "yum install -y cmake || apt-get install -y cmake"
+manylinux-x86_64-image = "manylinux_2_28"
+
+[tool.cibuildwheel.macos]
+archs = ["x86_64", "arm64"]
+
+[tool.cibuildwheel.windows]
+archs = ["AMD64"]
